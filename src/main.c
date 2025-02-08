@@ -14,21 +14,21 @@
 #define PRINT_ERR(fmt, ...) fprintf(stderr, "[ERROR] %s:%d: " fmt, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
 
 #define CELL_ARRAY_BOUNDS_CHECK(grid, y, x)                                      \
-    if (y > grid.height) {                                                       \
+    if (y > grid.rows) {                                                         \
         PRINT_ERR("Cell Array index out of range! Y Coordinate is too big.\n");  \
         exit(EX_DATAERR);                                                        \
     }                                                                            \
-    if (x > grid.width) {                                                        \
+    if (x > grid.cols) {                                                         \
         PRINT_ERR("Cell Array index out of range! X Coordinate is too big.\n");  \
         exit(EX_DATAERR);                                                        \
     }
 
 #define CELL_ARRAY_PTR_BOUNDS_CHECK(grid, y, x)                                  \
-    if (y > grid->height) {                                                      \
+    if (y > grid->rows) {                                                        \
         PRINT_ERR("Cell Array index out of range! Y Coordinate is too big.\n");  \
         exit(EX_DATAERR);                                                        \
     }                                                                            \
-    if (x > grid->width) {                                                       \
+    if (x > grid->cols) {                                                        \
         PRINT_ERR("Cell Array index out of range! X Coordinate is too big.\n");  \
         exit(EX_DATAERR);                                                        \
     }
@@ -38,8 +38,8 @@
 */
 typedef struct {
     bool **cells;
-    size_t width;
-    size_t height;
+    size_t cols;
+    size_t rows;
 } Cell_Array_2d;
 
 bool cell_array_get(Cell_Array_2d cell_array, size_t y, size_t x) {
@@ -57,8 +57,8 @@ void cell_array_set(Cell_Array_2d *cell_array, size_t y, size_t x, bool value) {
 Cell_Array_2d cell_array_init(size_t width, size_t height) {
     Cell_Array_2d cell_array = {
         .cells = malloc(sizeof(bool*) * height),
-        .width = width,
-        .height = height,
+        .cols = width,
+        .rows = height,
     };
     for (size_t idx = 0; idx < height; idx++) {
         cell_array.cells[idx] = malloc(sizeof(cell_array.cells[0]) * width);
@@ -74,12 +74,12 @@ Cell_Array_2d cell_array_init(size_t width, size_t height) {
 }
 
 void cell_array_free(Cell_Array_2d cell_array) {
-    for (size_t idx = 0; idx < cell_array.height; idx++) {
+    for (size_t idx = 0; idx < cell_array.rows; idx++) {
         free(cell_array.cells[idx]);
     }
     free(cell_array.cells);
-    cell_array.width = 0;
-    cell_array.height = 0;
+    cell_array.cols = 0;
+    cell_array.rows = 0;
 }
 
 uint8_t cell_array_alive_neighbor_count(Cell_Array_2d cell_array, size_t y, size_t x) {
@@ -108,7 +108,7 @@ uint8_t cell_array_alive_neighbor_count(Cell_Array_2d cell_array, size_t y, size
         size_t y_idx_unsigned = y_idx;
         size_t x_idx_unsigned = x_idx;
 
-        if (y_idx_unsigned >= cell_array.height || x_idx_unsigned >= cell_array.width) {
+        if (y_idx_unsigned >= cell_array.rows || x_idx_unsigned >= cell_array.cols) {
             continue;
         }
 
@@ -122,8 +122,8 @@ uint8_t cell_array_alive_neighbor_count(Cell_Array_2d cell_array, size_t y, size
 }
 
 void cell_array_print(Cell_Array_2d cell_array, bool print_neighbors) {
-    for (size_t y = 0; y < cell_array.height; y++) {
-        for (size_t x = 0; x < cell_array.width; x++) {
+    for (size_t y = 0; y < cell_array.rows; y++) {
+        for (size_t x = 0; x < cell_array.cols; x++) {
             if (print_neighbors) {
                 uint8_t alive_neighbor_count = cell_array_alive_neighbor_count(cell_array, y, x);
                 printf("%d", alive_neighbor_count);
@@ -165,7 +165,10 @@ void cursor_move(uint32_t x, uint32_t y) { printf("\x1B[%d;%dH", y, x); }
 
 static bool running = true;
 
-void *check_input(void *vargp) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+void *check_input_terminal(void *vargp) {
+#pragma GCC diagnostic pop
     char input = getchar();
 
     if (input == 'q' || input == 'Q') {
@@ -176,10 +179,10 @@ void *check_input(void *vargp) {
 }
 
 void step(Cell_Array_2d *grid) {
-    Cell_Array_2d new_grid = cell_array_init(grid->width, grid->height);
+    Cell_Array_2d new_grid = cell_array_init(grid->cols, grid->rows);
 
-    for (size_t y = 0; y < grid->height; y++) {
-        for (size_t x = 0; x < grid->height; x++) {
+    for (size_t y = 0; y < grid->rows; y++) {
+        for (size_t x = 0; x < grid->rows; x++) {
             uint8_t alive_neighbor_count = cell_array_alive_neighbor_count(*grid, y, x);
 
             if (cell_array_get(*grid, y, x) == true) {
@@ -218,18 +221,190 @@ void step(Cell_Array_2d *grid) {
     *grid = new_grid;
 }
 
-void render(Cell_Array_2d grid) {
+void render_terminal(Cell_Array_2d grid) {
     // Clear Screen
     cursor_move_home();
     erase_screen();
 
     // Print game
-    printf("Press Q to exit.\n\n");
+    printf("Press Space to step through. Press Q to exit.\n\n");
     cell_array_print(grid, false);
 }
 
+void run_terminal(Cell_Array_2d *grid, bool step_manually) {
+    // Init terminal and Quit input
+    cursor_visible(false);
+    enable_raw_mode();
+    pthread_t input_thread_id;
+    if (!step_manually) {
+        pthread_create(&input_thread_id, NULL, check_input_terminal, NULL);
+    }
+
+    {
+        #define US_PER_FRAME 400000 // ~60 FPS
+        /* #define US_PER_FRAME 1 // MAX SPEED */
+        struct timeval time_delta, time_start, time_end;
+        double accumulator = 0;
+
+        // Timekeeping
+        while (running) {
+            gettimeofday(&time_start, NULL);
+            time_delta.tv_usec = time_end.tv_usec - time_start.tv_usec;
+            // C is just too fast
+            accumulator += time_delta.tv_usec == 0 ? 1 : time_delta.tv_usec;
+
+            if (step_manually) {
+                char input = ' ';
+                while (input == ' ') {
+                    render_terminal(*grid);
+
+                    input = getchar();
+                    if (input == 'q') {
+                        running = false;
+                        break;
+                    }
+
+                    step(grid);
+                }
+            } else {
+                while (accumulator >= US_PER_FRAME) {
+                    accumulator -= US_PER_FRAME;
+                    step(grid);
+
+                    render_terminal(*grid);
+                }
+            }
+
+            gettimeofday(&time_end, NULL);
+        }
+    }
+
+    // Uninit terminal and Quit input
+    if (!step_manually) {
+        pthread_join(input_thread_id, NULL);
+    }
+    cursor_visible(true);
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+// TODO: make step_manually work with raylib
+void run_raylib(Cell_Array_2d *grid, bool step_manually) {
+#pragma GCC diagnostic pop
+
+    #include "raylib.h"
+
+    const size_t cell_padding = 1;
+    const size_t grid_padding = 10;
+    double window_width = 600;
+    double window_height = 600;
+    SetWindowState(FLAG_WINDOW_RESIZABLE);
+    InitWindow(window_width, window_height, "DEBUG");
+
+    // Magic timekeeping variables for a fixed timestep from the raylib examples:
+    // https://www.raylib.com/examples/core/loader.html?name=core_custom_frame_control
+    double previous_time = GetTime();
+    double current_time = 0.0;
+    double update_draw_time = 0.0;
+    double wait_time = 0.0;
+    double delta_time = 0.0;
+    // TODO: user input
+    size_t target_ups = 32;
+
+    while (!WindowShouldClose()) {
+        if (IsWindowResized()) {
+            window_width = GetScreenWidth();
+            window_height = GetScreenHeight();
+        }
+        window_width = MIN(window_width, window_height);
+        window_height = MIN(window_width, window_height);
+
+        double center_y = window_height / 2;
+        double center_x = window_width / 2;
+        double grid_area_width = window_width - grid_padding * 2;
+        double grid_area_height = window_height - grid_padding * 2;
+        double cell_width = (grid_area_width / grid->cols) - cell_padding;
+        double cell_height = (grid_area_height / grid->rows) - cell_padding;
+
+        BeginDrawing();
+        {
+            ClearBackground(RAYWHITE);
+
+            // Draw Grid
+            for (size_t y = 0; y <= grid->rows; y++) {
+                DrawLineEx(
+                    (Vector2) {
+                        .x = grid_padding,
+                        .y = grid_padding + cell_height * y + cell_padding * y,
+                    },
+                    (Vector2) {
+                        .x = window_width - grid_padding,
+                        .y = grid_padding + cell_height * y + cell_padding * y,
+                    },
+                    1,
+                    GRAY
+                );
+            }
+            for (size_t x = 0; x <= grid->cols; x++) {
+                DrawLineEx(
+                    (Vector2) {
+                        .x = grid_padding + cell_width * x + cell_padding * x,
+                        .y = grid_padding,
+                    },
+                    (Vector2) {
+                        .x = grid_padding + cell_width * x + cell_padding * x,
+                        .y = window_height - grid_padding,
+                    },
+                    1,
+                    GRAY
+                );
+            }
+
+            for (size_t y = 0; y < grid->rows; y++) {
+                for (size_t x = 0; x < grid->cols; x++) {
+                    if (cell_array_get(*grid, y, x) == false) {
+                        continue;
+                    }
+
+                    DrawRing(
+                        (Vector2) {
+                            .x = grid_padding + cell_width / 2 + cell_width * x + cell_padding * x,
+                            .y = grid_padding + cell_height / 2 + cell_height * y + cell_padding * y,
+                        },
+                        0,
+                        MIN(cell_width, cell_height) / 3,
+                        0,
+                        360,
+                        0,
+                        GREEN
+                    );
+                }
+            }
+        }
+        EndDrawing();
+
+        // Magic timekeeping for a fixed timestep from the raylib examples:
+        // https://www.raylib.com/examples/core/loader.html?name=core_custom_frame_control
+        current_time = GetTime();
+        update_draw_time = current_time - previous_time;
+        if (target_ups > 0) {
+            wait_time = (1.0f/(float)target_ups) - update_draw_time;
+            if (wait_time > 0.0) {
+                WaitTime((float)wait_time);
+                current_time = GetTime();
+                delta_time = (float)(current_time - previous_time);
+
+                step(grid);
+            }
+        }
+        previous_time = current_time;
+    }
+
+    CloseWindow();
+}
+
 int32_t main(void) {
-    Cell_Array_2d grid = cell_array_init(100, 100);
+    Cell_Array_2d grid = cell_array_init(69, 69);
 
     // Init grid
     // TODO: make user specified
@@ -275,59 +450,13 @@ int32_t main(void) {
 
     // TODO: user input
     bool step_manually = false;
+    bool raylib = true;
 
-    // Init terminal and Quit input
-    cursor_visible(false);
-    enable_raw_mode();
-    pthread_t input_thread_id;
-    if (!step_manually) {
-        pthread_create(&input_thread_id, NULL, check_input, NULL);
+    if (raylib) {
+        run_raylib(&grid, step_manually);
+    } else {
+        run_terminal(&grid, step_manually);
     }
-
-    {
-        #define US_PER_FRAME 400000 // ~60 FPS
-        /* #define US_PER_FRAME 1 // MAX SPEED */
-        struct timeval time_delta, time_start, time_end;
-        double accumulator = 0;
-
-        // Timekeeping
-        while (running) {
-            gettimeofday(&time_start, NULL);
-            time_delta.tv_usec = time_end.tv_usec - time_start.tv_usec;
-            // C is just too fast
-            accumulator += time_delta.tv_usec == 0 ? 1 : time_delta.tv_usec;
-
-            // :main loop
-            if (step_manually) {
-                char input = ' ';
-                while (input == ' ') {
-                    render(grid);
-
-                    input = getchar();
-                    if (input == 'q') {
-                        running = false;
-                        break;
-                    }
-
-                    step(&grid);
-                }
-            } else {
-                while (accumulator >= US_PER_FRAME) {
-                    accumulator -= US_PER_FRAME;
-                    step(&grid);
-                    render(grid);
-                }
-            }
-
-            gettimeofday(&time_end, NULL);
-        }
-    }
-
-    // Uninit terminal and Quit input
-    if (!step_manually) {
-        pthread_join(input_thread_id, NULL);
-    }
-    cursor_visible(true);
 
     // Free Grid memory
     cell_array_free(grid);
