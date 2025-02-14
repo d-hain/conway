@@ -2,7 +2,13 @@ NAME = conway
 
 CC = gcc
 CC_FLAGS = -std=c23
-CC_FLAGS += -Wall -Werror -Wextra -Wpedantic -w include/raylib.h
+CC_FLAGS += -Wall -Werror -Wextra -Wpedantic
+CC_FLAGS += -Wunused -Wunused-parameter -Wunused-but-set-parameter -Wunused-variable -Wunused-but-set-variable
+CC_FLAGS += -Wunused-const-variable -Wunused-function -Wunused-label -Wunused-local-typedefs -Wunused-macros -Wunused-value
+CC_FLAGS += -Wuse-after-free -Wuseless-cast
+CC_FLAGS += -fanalyzer -fanalyzer-fine-grained
+# Ignore warnings for Raylib
+CC_FLAGS += -w include/raylib.h
 CC_LINK_FLAGS = -I include -L lib -l:libraylib.a -lm -lglfw
 
 .PHONY: run-debug run-release

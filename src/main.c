@@ -2,35 +2,43 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 #include <unistd.h>
-#include <sysexits.h>
 #include <termios.h>
 #include <pthread.h>
 #include <sys/param.h>
 #include <sys/time.h>
 
+typedef enum {
+    EX_OK                   =   0,
+    EX_ARR_OUT_OF_RANGE     = 100,
+    EX_MEMORY_ALLOCATION    = 101,
+    EX_ARGUMENT_PARSE_ERROR = 102,
+} Exit_Codes;
+
 #define ARR_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-#define PRINT_ERR(fmt, ...) fprintf(stderr, "[ERROR] %s:%d: " fmt, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
+#define PRINT_ERR_LOC(fmt, ...) fprintf(stderr, "[ERROR] %s:%d: " fmt, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
+#define PRINT_ERR(fmt, ...) fprintf(stderr, "[ERROR] " fmt __VA_OPT__(,) __VA_ARGS__)
 
-#define CELL_ARRAY_BOUNDS_CHECK(grid, y, x)                                      \
-    if (y > grid.rows) {                                                         \
-        PRINT_ERR("Cell Array index out of range! Y Coordinate is too big.\n");  \
-        exit(EX_DATAERR);                                                        \
-    }                                                                            \
-    if (x > grid.cols) {                                                         \
-        PRINT_ERR("Cell Array index out of range! X Coordinate is too big.\n");  \
-        exit(EX_DATAERR);                                                        \
+#define CELL_ARRAY_BOUNDS_CHECK(grid, y, x)                                          \
+    if (y > grid.rows) {                                                             \
+        PRINT_ERR_LOC("Cell Array index out of range! Y Coordinate is too big.\n");  \
+        exit(EX_ARR_OUT_OF_RANGE);                                                   \
+    }                                                                                \
+    if (x > grid.cols) {                                                             \
+        PRINT_ERR_LOC("Cell Array index out of range! X Coordinate is too big.\n");  \
+        exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }
 
-#define CELL_ARRAY_PTR_BOUNDS_CHECK(grid, y, x)                                  \
-    if (y > grid->rows) {                                                        \
-        PRINT_ERR("Cell Array index out of range! Y Coordinate is too big.\n");  \
-        exit(EX_DATAERR);                                                        \
-    }                                                                            \
-    if (x > grid->cols) {                                                        \
-        PRINT_ERR("Cell Array index out of range! X Coordinate is too big.\n");  \
-        exit(EX_DATAERR);                                                        \
+#define CELL_ARRAY_PTR_BOUNDS_CHECK(grid, y, x)                                      \
+    if (y > grid->rows) {                                                            \
+        PRINT_ERR_LOC("Cell Array index out of range! Y Coordinate is too big.\n");  \
+        exit(EX_ARR_OUT_OF_RANGE);                                                   \
+    }                                                                                \
+    if (x > grid->cols) {                                                            \
+        PRINT_ERR_LOC("Cell Array index out of range! X Coordinate is too big.\n");  \
+        exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }
 
 /**
@@ -54,18 +62,33 @@ void cell_array_set(Cell_Array_2d *cell_array, size_t y, size_t x, bool value) {
     cell_array->cells[y][x] = value;
 }
 
-Cell_Array_2d cell_array_init(size_t width, size_t height) {
+Cell_Array_2d cell_array_init(size_t rows, size_t cols) {
     Cell_Array_2d cell_array = {
-        .cells = malloc(sizeof(bool*) * height),
-        .cols = width,
-        .rows = height,
+        .cells = malloc(sizeof(bool*) * rows),
+        .rows = rows,
+        .cols = cols,
     };
-    for (size_t idx = 0; idx < height; idx++) {
-        cell_array.cells[idx] = malloc(sizeof(cell_array.cells[0]) * width);
+    if (cell_array.cells == NULL) {
+        PRINT_ERR_LOC("Failed allocating memory for a Cell Array!");
+        exit(EX_MEMORY_ALLOCATION);
+    }
+    for (size_t y = 0; y < rows; y++) {
+        cell_array.cells[y] = malloc(sizeof(cell_array.cells[0]) * cols);
+
+        if (cell_array.cells[y] == NULL) {
+            // Free previously allocated rows.
+            for (size_t y_old = 0; y_old < y; y_old++) {
+                free(cell_array.cells[y_old]);
+            }
+            free(cell_array.cells);
+
+            PRINT_ERR_LOC("Failed allocating memory for a Cell Array!");
+            exit(EX_MEMORY_ALLOCATION);
+        }
     }
 
-    for (size_t y = 0; y < height; y++) {
-        for (size_t x = 0; x < width; x++) {
+    for (size_t y = 0; y < rows; y++) {
+        for (size_t x = 0; x < cols; x++) {
             cell_array.cells[y][x] = false;
         }
     }
@@ -179,10 +202,10 @@ void *check_input_terminal(void *vargp) {
 }
 
 void step(Cell_Array_2d *grid) {
-    Cell_Array_2d new_grid = cell_array_init(grid->cols, grid->rows);
+    Cell_Array_2d new_grid = cell_array_init(grid->rows, grid->cols);
 
     for (size_t y = 0; y < grid->rows; y++) {
-        for (size_t x = 0; x < grid->rows; x++) {
+        for (size_t x = 0; x < grid->cols; x++) {
             uint8_t alive_neighbor_count = cell_array_alive_neighbor_count(*grid, y, x);
 
             if (cell_array_get(*grid, y, x) == true) {
@@ -245,6 +268,7 @@ void run_terminal(Cell_Array_2d *grid, bool step_manually) {
         /* #define US_PER_FRAME 1 // MAX SPEED */
         struct timeval time_delta, time_start, time_end;
         double accumulator = 0;
+        gettimeofday(&time_end, NULL);
 
         // Timekeeping
         while (running) {
@@ -255,7 +279,7 @@ void run_terminal(Cell_Array_2d *grid, bool step_manually) {
 
             if (step_manually) {
                 char input = ' ';
-                while (input == ' ') {
+                while (input != 'q') {
                     render_terminal(*grid);
 
                     input = getchar();
@@ -286,12 +310,7 @@ void run_terminal(Cell_Array_2d *grid, bool step_manually) {
     cursor_visible(true);
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-// TODO: make step_manually work with raylib
 void run_raylib(Cell_Array_2d *grid, bool step_manually) {
-#pragma GCC diagnostic pop
-
     #include "raylib.h"
 
     const size_t cell_padding = 1;
@@ -303,15 +322,14 @@ void run_raylib(Cell_Array_2d *grid, bool step_manually) {
 
     // Magic timekeeping variables for a fixed timestep from the raylib examples:
     // https://www.raylib.com/examples/core/loader.html?name=core_custom_frame_control
-    double previous_time = GetTime();
-    double current_time = 0.0;
-    double update_draw_time = 0.0;
-    double wait_time = 0.0;
-    double delta_time = 0.0;
-    // TODO: user input
-    size_t target_ups = 32;
+    double previous_time_s = GetTime();
+    const size_t target_ups = 32;
 
     while (!WindowShouldClose()) {
+        if (IsKeyDown(KEY_Q)) {
+            break;
+        }
+
         if (IsWindowResized()) {
             window_width = GetScreenWidth();
             window_height = GetScreenHeight();
@@ -383,28 +401,125 @@ void run_raylib(Cell_Array_2d *grid, bool step_manually) {
         }
         EndDrawing();
 
-        // Magic timekeeping for a fixed timestep from the raylib examples:
-        // https://www.raylib.com/examples/core/loader.html?name=core_custom_frame_control
-        current_time = GetTime();
-        update_draw_time = current_time - previous_time;
-        if (target_ups > 0) {
-            wait_time = (1.0f/(float)target_ups) - update_draw_time;
-            if (wait_time > 0.0) {
-                WaitTime((float)wait_time);
-                current_time = GetTime();
-                delta_time = (float)(current_time - previous_time);
-
+        if (step_manually) {
+            if (IsKeyDown(KEY_SPACE)) {
                 step(grid);
+                WaitTime(0.07);
             }
+        } else {
+            // Magic timekeeping for a fixed timestep from the raylib examples:
+            // https://www.raylib.com/examples/core/loader.html?name=core_custom_frame_control
+            double current_time_s = GetTime();
+            double update_draw_time_s = current_time_s - previous_time_s;
+            if (target_ups > 0) {
+                double wait_time_s = (1.0f/(float)target_ups) - update_draw_time_s;
+                if (wait_time_s > 0.0) {
+                    WaitTime((float)wait_time_s);
+                    current_time_s = GetTime();
+
+                    step(grid);
+                }
+            }
+            previous_time_s = current_time_s;
         }
-        previous_time = current_time;
     }
 
     CloseWindow();
 }
 
-int32_t main(void) {
-    Cell_Array_2d grid = cell_array_init(69, 69);
+typedef struct {
+    size_t grid_rows;
+    size_t grid_cols;
+
+    bool step_manually;
+    bool raylib;
+} Config;
+
+Config parse_arguments(int argc, char *argv[]) {
+    Config config = {
+        .grid_rows = 69,
+        .grid_cols = 69,
+    };
+
+    #define PRINT_USAGE()                                                                    \
+        printf(                                                                              \
+            "Simulate Conway's Game of Life either in the terminal or a graphical window.\n" \
+            "\n"                                                                             \
+            "Usage: conway [options]\n"                                                      \
+            "\n"                                                                             \
+            "Options:\n"                                                                     \
+            "    -h, --help\n"                                                               \
+            "        Print this message.\n"                                                  \
+            "\n"                                                                             \
+            "    --grid-rows <positive number>\n"                                            \
+            "    --grid-cols <positive number>\n"                                            \
+            "    --step-manually\n"                                                          \
+            "        Step manually by pressing SPACE.\n"                                     \
+            "    --graphical, --raylib\n"                                                    \
+            "        Display the game using a graphical interface (with Raylib btw).\n"      \
+        )
+
+    for (size_t idx = 0; idx < argc; idx++) {
+        char *arg = argv[idx];
+
+        if (arg[0] == '-') {
+            char *name = &arg[1];
+
+            if (strcmp(name, "h") == 0) {
+                PRINT_USAGE();
+                break;
+            }
+
+            if (arg[1] == '-') {
+                name = &arg[2];
+
+                if (strcmp(name, "help") == 0) {
+                    PRINT_USAGE();
+                    break;
+                }
+
+                if (idx >= argc - 1) {
+                    PRINT_ERR("Argument '%s' needs to have a value!\n", name);
+                }
+                char *value = argv[idx + 1];
+
+                if (strcmp(name, "grid-rows") == 0) {
+                    size_t rows = atoi(value);
+                    if (rows == 0) {
+                        PRINT_ERR("Grid rows should be bigger than 0.\n");
+                        exit(EX_ARGUMENT_PARSE_ERROR);
+                    }
+
+                    config.grid_rows = atoi(value);
+                } else
+                if (strcmp(name, "grid-cols") == 0) {
+                    size_t cols = atoi(value);
+                    if (cols == 0) {
+                        PRINT_ERR("Grid columns should be bigger than 0.\n");
+                        exit(EX_ARGUMENT_PARSE_ERROR);
+                    }
+
+                    config.grid_cols = atoi(value);
+                } else
+                if (strcmp(name, "step-manually") == 0) {
+                    config.step_manually = true;
+                } else
+                if (strcmp(name, "graphical") == 0) {
+                    config.raylib = true;
+                } else
+                if (strcmp(name, "raylib") == 0) {
+                    config.raylib = true;
+                }
+            }
+        }
+    }
+
+    return config;
+}
+
+int32_t main(int argc, char *argv[]) {
+    Config config = parse_arguments(argc, argv);
+    Cell_Array_2d grid = cell_array_init(config.grid_rows, config.grid_cols);
 
     // Init grid
     // TODO: make user specified
@@ -448,14 +563,10 @@ int32_t main(void) {
     cell_array_set(&grid, 14, 45, true);
     cell_array_set(&grid, 14, 46, true);
 
-    // TODO: user input
-    bool step_manually = false;
-    bool raylib = true;
-
-    if (raylib) {
-        run_raylib(&grid, step_manually);
+    if (config.raylib) {
+        run_raylib(&grid, config.step_manually);
     } else {
-        run_terminal(&grid, step_manually);
+        run_terminal(&grid, config.step_manually);
     }
 
     // Free Grid memory
