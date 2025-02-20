@@ -12,8 +12,8 @@ CC_FLAGS += -w include/raylib.h
 CC_LINK_FLAGS = -I include -L lib -l:libraylib.a -lm -lglfw
 
 debug/$(NAME): src/main.c debug
-	$(CC) src/main.c -o debug/$(NAME) $(CC_FLAGS) $(CC_LINK_FLAGS) -ggdb
-	chmod u+x ./debug/$(NAME)
+	$(CC) src/main.c -o debug/$(NAME)-debug $(CC_FLAGS) $(CC_LINK_FLAGS) -ggdb
+	chmod u+x ./debug/$(NAME)-debug
 
 release/$(NAME): src/main.c release
 	$(CC) src/main.c -o release/$(NAME) $(CC_FLAGS) $(CC_LINK_FLAGS) -O3

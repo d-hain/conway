@@ -60,8 +60,7 @@
         installPhase = ''
           mkdir -p $out/bin
 
-          mkdir -p $out/bin/debug
-          cp debug/* $out/bin/debug
+          cp debug/* $out/bin
         '';
       });
     };
