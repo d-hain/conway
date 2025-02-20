@@ -10,35 +10,60 @@
     nixpkgs,
     ...
   }: let
-    name = "conway";
+    game-name = "conway";
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
   in {
-    packages.${system}.default = pkgs.stdenv.mkDerivation {
-      pname = name;
-      version = "0.1.0";
-      src = ./.;
+    packages.${system} = {
+      default = self.packages.${system}.${game-name};
 
-      # Static linking
-      raylib = pkgs.raylib.override { sharedLib = false; };
+      ${game-name} = pkgs.stdenv.mkDerivation {
+        pname = game-name;
+        version = "0.1";
+        src = ./.;
 
-      nativeBuildInputs = with pkgs; [
-        gcc
-        raylib
-        glfw
-      ];
+        # Static linking
+        raylib = pkgs.raylib.override {sharedLib = false;};
 
-      buildPhase = ''
-        cp -r $raylib/include .
-        cp -r $raylib/lib .
+        nativeBuildInputs = with pkgs; [
+          gcc
+          raylib
+          glfw
+        ];
 
-        make target/$pname
-      '';
+        buildPhase = ''
+          cp -r $raylib/include .
+          cp -r $raylib/lib .
 
-      installPhase = ''
-        mkdir -p $out/bin
-        cp target/* $out/bin
-      '';
+          make release/${game-name}
+        '';
+
+        installPhase = ''
+          mkdir -p $out/bin
+
+          cp release/* $out/bin
+        '';
+      };
+
+      "${game-name}-debug" = self.packages.${system}.${game-name}.overrideAttrs (old: {
+        pname = "${game-name}-debug";
+        dontStrip = true;
+        enableDebugging = true;
+
+        buildPhase = ''
+          cp -r $raylib/include .
+          cp -r $raylib/lib .
+
+          make debug/${game-name}
+        '';
+
+        installPhase = ''
+          mkdir -p $out/bin
+
+          mkdir -p $out/bin/debug
+          cp debug/* $out/bin/debug
+        '';
+      });
     };
 
     # For completions in Neovim

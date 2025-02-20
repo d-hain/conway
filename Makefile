@@ -11,24 +11,16 @@ CC_FLAGS += -fanalyzer -fanalyzer-fine-grained
 CC_FLAGS += -w include/raylib.h
 CC_LINK_FLAGS = -I include -L lib -l:libraylib.a -lm -lglfw
 
-.PHONY: run-debug run-release
+debug/$(NAME): src/main.c debug
+	$(CC) src/main.c -o debug/$(NAME) $(CC_FLAGS) $(CC_LINK_FLAGS) -ggdb
+	chmod u+x ./debug/$(NAME)
 
-run-debug: target/$(NAME)
-	./target/$(NAME)
+release/$(NAME): src/main.c release
+	$(CC) src/main.c -o release/$(NAME) $(CC_FLAGS) $(CC_LINK_FLAGS) -O3
+	chmod u+x ./release/$(NAME)
 
-run-release: target/release/$(NAME)
-	./target/release/$(NAME)
+debug:
+	mkdir -p debug
 
-target/$(NAME): src/main.c target
-	$(CC) src/main.c -o target/$(NAME) $(CC_FLAGS) $(CC_LINK_FLAGS) -ggdb
-	chmod u+x ./target/$(NAME)
-
-target/release/$(NAME): src/main.c target/release
-	$(CC) src/main.c -o target/release/$(NAME) $(CC_FLAGS) $(CC_LINK_FLAGS) -O3
-	chmod u+x ./target/release/$(NAME)
-
-target:
-	mkdir -p target
-
-target/release:
-	mkdir -p target/release
+release:
+	mkdir -p release
