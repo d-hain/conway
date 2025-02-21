@@ -212,6 +212,20 @@ void clear_color(void) { printf("\x1B[0m"); }
 
 static bool running = true;
 
+void ctrlc_handler(int _signum) { running = false; }
+
+// Catches the CTRL+C signal and calls the `ctrlc_handler` function.
+// NOTE: $ man 2 sigaction
+void setup_ctrlc_handler(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(struct sigaction));
+    sa.sa_handler = ctrlc_handler;
+    sa.sa_flags = 0;
+
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+}
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 void *check_input_terminal(void *vargp) {
@@ -301,7 +315,60 @@ bool is_digit(const char input) {
     return false;
 }
 
-void set_starting_input(const Cell_Array_2d *grid, const Color_Scheme color_scheme) {
+void set_starting_input(const Cell_Array_2d *grid, const char *input, const size_t input_len) {
+    if (input_len == 0) return;
+
+    // Parse user input
+    #define PARSE_AND_SET_NUMBERS()                                 \
+        if (numbers[0].is_some && numbers[1].is_some) {             \
+            size_t positions[2] = {0};                              \
+            positions[0] = atoi(numbers[0].digits);                 \
+            positions[1] = atoi(numbers[1].digits);                 \
+            cell_array_set(grid, positions[0], positions[1], true); \
+        }
+
+    typedef struct {
+        // Up to 99_999 must be enough.
+        char digits[5];
+        bool is_some;
+    } Number_Or_None;
+
+    Number_Or_None numbers[2]; // [0] => row, [1] => col
+    size_t number_idx = 0;
+    size_t digit_idx = 0;
+    for (size_t idx = 0; idx < input_len; idx++) {
+        char c = input[idx];
+
+        if (c == ' ') {
+            if (number_idx == 1) {
+                PARSE_AND_SET_NUMBERS();
+            }
+
+            number_idx = 0;
+            digit_idx = 0;
+            for (size_t i = 0; i < 2; i++) {
+                numbers[i].is_some = false;
+                for (size_t j = 0; j < 5; j++) {
+                    numbers[i].digits[j] = 0;
+                }
+            }
+            continue;
+        }
+
+        if (is_digit(c)) {
+            numbers[number_idx].is_some = true;
+            numbers[number_idx].digits[digit_idx] = c;
+            digit_idx++;
+        } else
+        if (c == ',') {
+            number_idx = 1;
+            digit_idx = 0;
+        }
+    }
+    PARSE_AND_SET_NUMBERS();
+}
+
+void terminal_get_starting_input(const Cell_Array_2d *grid, const Color_Scheme color_scheme) {
     render_terminal(*grid, color_scheme);
     printf(
         "Give some starting input.\n"
@@ -322,51 +389,14 @@ void set_starting_input(const Cell_Array_2d *grid, const Color_Scheme color_sche
     // Remove newline
     line[line_length - 1] = '\0';
 
-    // Parse user input
-    #define PARSE_AND_SET_NUMBERS()      \
-        size_t positions[2] = {0};       \
-        positions[0] = atoi(numbers[0]); \
-        positions[1] = atoi(numbers[1]); \
-        cell_array_set(grid, positions[0], positions[1], true);
-
-    // Up to 99_999 must be enough.
-    char numbers[2][5]; // [0] => row, [1] => col
-    size_t number_idx = 0;
-    size_t digit_idx = 0;
-    for (size_t idx = 0; idx < line_length; idx++) {
-        char c = line[idx];
-
-        if (c == ' ') {
-            if (number_idx == 1) {
-                PARSE_AND_SET_NUMBERS();
-            }
-
-            number_idx = 0;
-            digit_idx = 0;
-            for (size_t i = 0; i < 2; i++) {
-                for (size_t j = 0; j < 5; j++) {
-                    numbers[i][j] = 0;
-                }
-            }
-            continue;
-        }
-
-        if (is_digit(c)) {
-            numbers[number_idx][digit_idx] = c;
-            digit_idx++;
-        } else
-        if (c == ',') {
-            number_idx = 1;
-            digit_idx = 0;
-        }
-    }
-    PARSE_AND_SET_NUMBERS();
+    set_starting_input(grid, line, line_length);
 
     free(line);
 }
 
 void run_terminal(Cell_Array_2d *grid, const bool step_manually, const Color_Scheme color_scheme) {
-    set_starting_input(grid, color_scheme);
+    setup_ctrlc_handler();
+    terminal_get_starting_input(grid, color_scheme);
 
     // Init terminal and Quit input
     cursor_visible(false);
@@ -437,7 +467,8 @@ Vector2 raylib_draw_grid(
     const size_t cell_padding,
     const double window_width,
     const double window_height,
-    const Color_Scheme color_scheme
+    const Color_Scheme color_scheme,
+    const bool draw_grid
 ) {
     const double grid_area_width = window_width - grid_padding_left - grid_padding_right;
     const double grid_area_height = window_height - grid_padding_top - grid_padding_bottom;
@@ -446,7 +477,7 @@ Vector2 raylib_draw_grid(
 
     // Draw Grid
     // Horizontal lines
-    if (color_scheme == COLOR_SCHEME_DEFAULT) {
+    if (color_scheme == COLOR_SCHEME_DEFAULT || draw_grid) {
         for (size_t row = 0; row <= grid.rows; row++) {
             DrawLineEx(
                 (Vector2) {
@@ -596,7 +627,8 @@ void run_raylib(Cell_Array_2d *grid, const bool step_manually, const bool show_f
                     cell_padding,
                     window_width,
                     window_height,
-                    color_scheme
+                    color_scheme,
+                    true
                 );
 
                 if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
@@ -640,7 +672,8 @@ void run_raylib(Cell_Array_2d *grid, const bool step_manually, const bool show_f
                     cell_padding,
                     window_width,
                     window_height,
-                    color_scheme
+                    color_scheme,
+                    false
                 );
 
                 if (show_fps) {
@@ -688,9 +721,11 @@ typedef struct {
     bool show_fps;
     bool glider_gun;
     Color_Scheme color_scheme;
+
+    char *starting_input;
 } Config;
 
-Config parse_arguments(const int argc, const char *argv[]) {
+Config parse_arguments(const int argc, char *argv[]) {
     Config config = {
         .grid_rows = 69,
         .grid_cols = 69,
@@ -698,39 +733,47 @@ Config parse_arguments(const int argc, const char *argv[]) {
         .raylib = false,
         .show_fps = false,
         .glider_gun = false,
+        .starting_input = "",
         .color_scheme = -1,
     };
 
-    #define PRINT_USAGE()                                                                    \
-        printf(                                                                              \
-            "Simulate Conway's Game of Life either in the terminal or a graphical window.\n" \
-            "\n"                                                                             \
-            "Usage: conway [options]\n"                                                      \
-            "\n"                                                                             \
-            "Options:\n"                                                                     \
-            "    -h, --help\n"                                                               \
-            "        Print this message.\n"                                                  \
-            "\n"                                                                             \
-            "    --grid-rows <positive number>\n"                                            \
-            "    --grid-cols <positive number>\n"                                            \
-            "\n"                                                                             \
-            "    --step-manually\n"                                                          \
-            "        Step manually by pressing SPACE.\n"                                     \
-            "\n"                                                                             \
-            "    --graphical, --raylib\n"                                                    \
-            "        Display the game using a graphical interface (with Raylib btw).\n"      \
-            "\n"                                                                             \
-            "    --show-fps\n"                                                               \
-            "        Show the FPS when rendering using raylib.\n"                            \
-            "\n"                                                                             \
-            "    --color-scheme <color scheme>\n"                                            \
-            "        Different funky colors.\n"                                              \
-            "        Available color schemes:\n"                                             \
-        );                                                                                   \
+    #define PRINT_USAGE()                                                                                           \
+        printf(                                                                                                     \
+            "Simulate Conway's Game of Life either in the terminal or a graphical window.\n"                        \
+            "\n"                                                                                                    \
+            "Usage: conway [options]\n"                                                                             \
+            "\n"                                                                                                    \
+            "Options:\n"                                                                                            \
+            "    -h, --help\n"                                                                                      \
+            "        Print this message.\n"                                                                         \
+            "\n"                                                                                                    \
+            "    --grid-rows <positive number>\n"                                                                   \
+            "    --grid-cols <positive number>\n"                                                                   \
+            "\n"                                                                                                    \
+            "    --step-manually\n"                                                                                 \
+            "        Step manually by pressing SPACE.\n"                                                            \
+            "\n"                                                                                                    \
+            "    --graphical, --raylib\n"                                                                           \
+            "        Display the game using a graphical interface (with Raylib btw).\n"                             \
+            "\n"                                                                                                    \
+            "    --show-fps\n"                                                                                      \
+            "        Show the FPS when rendering using raylib.\n"                                                   \
+            "\n"                                                                                                    \
+            "    --glider-gun\n"                                                                                    \
+            "        Start the game with Gosper's glider gun in the top left.\n"                                    \
+            "\n"                                                                                                    \
+            "    --starting-input <input>\n"                                                                        \
+            "        Specify the starting input in a space and comma separated string like this:"                   \
+            "           --starting-input \"<row>,<col> <row>,<col> ...\"\n"                                         \
+            "\n"                                                                                                    \
+            "    --color-scheme <color scheme>\n"                                                                   \
+            "        Different funky colors.\n"                                                                     \
+            "        Available color schemes:\n"                                                                    \
+        );                                                                                                          \
         for (Color_Scheme color_scheme = COLOR_SCHEME_DEFAULT; color_scheme < COLOR_SCHEME_COUNT; color_scheme++) { \
-            printf(                                                                          \
-            "            %s\n", color_scheme_to_string(color_scheme)                             \
-            );                                                                               \
+            printf(                                                                                                 \
+            "            %s\n", color_scheme_to_string(color_scheme)                                                \
+            );                                                                                                      \
         }
 
     for (size_t idx = 0; idx < argc; idx++) {
@@ -751,6 +794,18 @@ Config parse_arguments(const int argc, const char *argv[]) {
                 if (strcmp(name, "help") == 0) {
                     PRINT_USAGE();
                     exit(EX_SHOW_USAGE);
+                } else
+                if (strcmp(name, "step-manually") == 0) {
+                    config.step_manually = true;
+                    continue;
+                } else
+                if (strcmp(name, "graphical") == 0) {
+                    config.raylib = true;
+                    continue;
+                } else
+                if (strcmp(name, "raylib") == 0) {
+                    config.raylib = true;
+                    continue;
                 } else
                 if (strcmp(name, "glider-gun") == 0) {
                     if (config.grid_rows < 12 || config.grid_cols < 38) {
@@ -776,7 +831,7 @@ Config parse_arguments(const int argc, const char *argv[]) {
                     PRINT_ERR("Argument '%s' needs to have a value!\n", name);
                     exit(EX_ARGUMENT_PARSE_ERROR);
                 }
-                const char *value = argv[idx + 1];
+                char *value = argv[idx + 1];
 
                 // Options with a value
                 if (strcmp(name, "grid-rows") == 0) {
@@ -797,14 +852,8 @@ Config parse_arguments(const int argc, const char *argv[]) {
 
                     config.grid_cols = atoi(value);
                 } else
-                if (strcmp(name, "step-manually") == 0) {
-                    config.step_manually = true;
-                } else
-                if (strcmp(name, "graphical") == 0) {
-                    config.raylib = true;
-                } else
-                if (strcmp(name, "raylib") == 0) {
-                    config.raylib = true;
+                if (strcmp(name, "starting-input") == 0) {
+                    config.starting_input = value;
                 } else
                 if (strcmp(name, "color-scheme") == 0) {
                     for (Color_Scheme color_scheme = COLOR_SCHEME_DEFAULT; color_scheme < COLOR_SCHEME_COUNT; color_scheme++) {
@@ -833,9 +882,12 @@ Config parse_arguments(const int argc, const char *argv[]) {
     return config;
 }
 
-int32_t main(const int argc, const char *argv[]) {
+int32_t main(const int argc, char *argv[]) {
     const Config config = parse_arguments(argc, argv);
     Cell_Array_2d grid = cell_array_init(config.grid_rows, config.grid_cols);
+    if (strcmp(config.starting_input, "") != 0) {
+        set_starting_input(&grid, config.starting_input, strlen(config.starting_input));
+    }
 
     // Init default grid pattern
     if (config.glider_gun) {
