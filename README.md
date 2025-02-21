@@ -8,8 +8,7 @@ Controls are "q" for quitting, "space" for manually stepping through the
 simulation when using --step-manually and the mouse for interacting with the
 graphical window.
 
-![Raylib with the hacker colorscheme](./images/raylib-hacker.png)
-![Terminal with the default colorscheme](./images/terminal-default.png)
+<img src="./images/raylib-hacker.png" width="69%" alt="Raylib with the hacker colorscheme" />
 
 ## Running the game
 
