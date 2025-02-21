@@ -563,10 +563,17 @@ void run_raylib(Cell_Array_2d *grid, const bool step_manually, const bool show_f
 
     const size_t cell_padding = 1;
     const size_t grid_padding = 10;
-    double window_width = 600;
-    double window_height = 600;
+
+    // HACK: Is this how you do that in raylib?! Well what works works ig...
+    InitWindow(1, 1, "Temporary window to get the monitor");
+    const int current_monitor = GetCurrentMonitor();
+    const int smallest_monitor_dimension = MIN(GetMonitorWidth(current_monitor), GetMonitorHeight(current_monitor));
+    double window_width = smallest_monitor_dimension / 1.8;
+    double window_height = smallest_monitor_dimension / 1.8;
+    CloseWindow();
+
     SetWindowState(FLAG_WINDOW_RESIZABLE);
-    InitWindow(window_width, window_height, "DEBUG");
+    InitWindow(window_width, window_height, "Conway");
 
     // Magic timekeeping variables for a fixed timestep from the raylib examples:
     // https://www.raylib.com/examples/core/loader.html?name=core_custom_frame_control
