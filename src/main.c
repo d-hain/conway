@@ -24,22 +24,22 @@ typedef enum {
 #define PRINT_ERR_LOC(fmt, ...) fprintf(stderr, "[ERROR] %s:%d: " fmt, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
 #define PRINT_ERR(fmt, ...) fprintf(stderr, "[ERROR] " fmt __VA_OPT__(,) __VA_ARGS__)
 
-#define CELL_ARRAY_BOUNDS_CHECK(grid, y, x)                                          \
-    if (y > grid.rows) {                                                             \
+#define CELL_ARRAY_BOUNDS_CHECK(grid, row, col)                                      \
+    if (row > grid.rows) {                                                           \
         PRINT_ERR_LOC("Cell Array index out of range! Y Coordinate is too big.\n");  \
         exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }                                                                                \
-    if (x > grid.cols) {                                                             \
+    if (col > grid.cols) {                                                           \
         PRINT_ERR_LOC("Cell Array index out of range! X Coordinate is too big.\n");  \
         exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }
 
-#define CELL_ARRAY_PTR_BOUNDS_CHECK(grid, y, x)                                      \
-    if (y > grid->rows) {                                                            \
+#define CELL_ARRAY_PTR_BOUNDS_CHECK(grid, row, col)                                  \
+    if (row > grid->rows) {                                                          \
         PRINT_ERR_LOC("Cell Array index out of range! Y Coordinate is too big.\n");  \
         exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }                                                                                \
-    if (x > grid->cols) {                                                            \
+    if (col > grid->cols) {                                                          \
         PRINT_ERR_LOC("Cell Array index out of range! X Coordinate is too big.\n");  \
         exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }
@@ -75,12 +75,12 @@ Cell_Array_2d cell_array_init(size_t rows, size_t cols) {
         PRINT_ERR_LOC("Failed allocating memory for a Cell Array!");
         exit(EX_MEMORY_ALLOCATION);
     }
-    for (size_t y = 0; y < rows; y++) {
-        cell_array.cells[y] = malloc(sizeof(cell_array.cells[0]) * cols);
+    for (size_t row = 0; row < rows; row++) {
+        cell_array.cells[row] = malloc(sizeof(cell_array.cells[0]) * cols);
 
-        if (cell_array.cells[y] == NULL) {
+        if (cell_array.cells[row] == NULL) {
             // Free previously allocated rows.
-            for (size_t y_old = 0; y_old < y; y_old++) {
+            for (size_t y_old = 0; y_old < row; y_old++) {
                 free(cell_array.cells[y_old]);
             }
             free(cell_array.cells);
@@ -90,9 +90,9 @@ Cell_Array_2d cell_array_init(size_t rows, size_t cols) {
         }
     }
 
-    for (size_t y = 0; y < rows; y++) {
-        for (size_t x = 0; x < cols; x++) {
-            cell_array.cells[y][x] = false;
+    for (size_t row = 0; row < rows; row++) {
+        for (size_t col = 0; col < cols; col++) {
+            cell_array.cells[row][col] = false;
         }
     }
 
@@ -125,21 +125,21 @@ uint8_t cell_array_alive_neighbor_count(Cell_Array_2d cell_array, size_t row, si
     uint8_t alive_neighbor_count = 0;
     for (size_t i = 0; i < ARR_LEN(indices); i++) {
         // Validate indices
-        int32_t y_idx = indices[i][0];
-        int32_t x_idx = indices[i][1];
+        int32_t row_idx = indices[i][0];
+        int32_t col_idx = indices[i][1];
 
-        if (y_idx < 0 || x_idx < 0) {
+        if (row_idx < 0 || col_idx < 0) {
             continue;
         }
-        size_t y_idx_unsigned = y_idx;
-        size_t x_idx_unsigned = x_idx;
+        size_t row_idx_unsigned = row_idx;
+        size_t col_idx_unsigned = col_idx;
 
-        if (y_idx_unsigned >= cell_array.rows || x_idx_unsigned >= cell_array.cols) {
+        if (row_idx_unsigned >= cell_array.rows || col_idx_unsigned >= cell_array.cols) {
             continue;
         }
 
         // Index is valid -> check if alive
-        if (cell_array_get(cell_array, y_idx_unsigned, x_idx_unsigned) == true) {
+        if (cell_array_get(cell_array, row_idx_unsigned, col_idx_unsigned) == true) {
             alive_neighbor_count++;
         }
     }
@@ -161,15 +161,15 @@ char *color_scheme_to_string(Color_Scheme color_scheme) {
 }
 
 void cell_array_print(Cell_Array_2d cell_array, Color_Scheme color_scheme) {
-    for (size_t y = 0; y < cell_array.rows; y++) {
-        for (size_t x = 0; x < cell_array.cols; x++) {
+    for (size_t row = 0; row < cell_array.rows; row++) {
+        for (size_t col = 0; col < cell_array.cols; col++) {
             char empty_cell = '.';
             switch (color_scheme) {
                 case COLOR_SCHEME_DEFAULT: empty_cell = '.'; break;
                 case COLOR_SCHEME_HACKER: empty_cell = ' '; break;
             }
 
-            printf("%c", cell_array_get(cell_array, y, x) ? 'X' : empty_cell);
+            printf("%c", cell_array_get(cell_array, row, col) ? 'X' : empty_cell);
         }
         printf("\n");
     }
@@ -227,11 +227,11 @@ void *check_input_terminal(void *vargp) {
 void step(Cell_Array_2d *grid) {
     Cell_Array_2d new_grid = cell_array_init(grid->rows, grid->cols);
 
-    for (size_t y = 0; y < grid->rows; y++) {
-        for (size_t x = 0; x < grid->cols; x++) {
-            uint8_t alive_neighbor_count = cell_array_alive_neighbor_count(*grid, y, x);
+    for (size_t row = 0; row < grid->rows; row++) {
+        for (size_t col = 0; col < grid->cols; col++) {
+            uint8_t alive_neighbor_count = cell_array_alive_neighbor_count(*grid, row, col);
 
-            if (cell_array_get(*grid, y, x) == true) {
+            if (cell_array_get(*grid, row, col) == true) {
                 // Alive Cell
                 switch (alive_neighbor_count) {
                 case 0:
@@ -242,14 +242,14 @@ void step(Cell_Array_2d *grid) {
                 case 7:
                 case 8: {
                     // Die
-                    cell_array_set(&new_grid, y, x, false);
+                    cell_array_set(&new_grid, row, col, false);
                     break;
                 }
 
                 case 2:
                 case 3: {
                     // Live
-                    cell_array_set(&new_grid, y, x, true);
+                    cell_array_set(&new_grid, row, col, true);
                     break;
                 }
                 }
@@ -257,7 +257,7 @@ void step(Cell_Array_2d *grid) {
                 // Dead Cell
                 if (alive_neighbor_count == 3) {
                     // Resurrect
-                    cell_array_set(&new_grid, y, x, true);
+                    cell_array_set(&new_grid, row, col, true);
                 }
             }
         }
@@ -438,29 +438,29 @@ void raylib_draw_grid(
     // Draw Grid
     // Horizontal lines
     if (color_scheme == COLOR_SCHEME_DEFAULT) {
-        for (size_t y = 0; y <= grid.rows; y++) {
+        for (size_t row = 0; row <= grid.rows; row++) {
             DrawLineEx(
                 (Vector2) {
                     .x = grid_padding,
-                    .y = grid_padding + cell_height * y + cell_padding * y,
+                    .y = grid_padding + cell_height * row + cell_padding * row,
                 },
                 (Vector2) {
                     .x = window_width - grid_padding,
-                    .y = grid_padding + cell_height * y + cell_padding * y,
+                    .y = grid_padding + cell_height * row + cell_padding * row,
                 },
                 1,
                 GRAY
             );
         }
         // Vertical lines
-        for (size_t x = 0; x <= grid.cols; x++) {
+        for (size_t col = 0; col <= grid.cols; col++) {
             DrawLineEx(
                 (Vector2) {
-                    .x = grid_padding + cell_width * x + cell_padding * x,
+                    .x = grid_padding + cell_width * col + cell_padding * col,
                     .y = grid_padding,
                 },
                 (Vector2) {
-                    .x = grid_padding + cell_width * x + cell_padding * x,
+                    .x = grid_padding + cell_width * col + cell_padding * col,
                     .y = window_height - grid_padding,
                 },
                 1,
@@ -470,9 +470,9 @@ void raylib_draw_grid(
     }
 
     // Draw Alive Cells
-    for (size_t y = 0; y < grid.rows; y++) {
-        for (size_t x = 0; x < grid.cols; x++) {
-            if (cell_array_get(grid, y, x) == false) {
+    for (size_t row = 0; row < grid.rows; row++) {
+        for (size_t col = 0; col < grid.cols; col++) {
+            if (cell_array_get(grid, row, col) == false) {
                 continue;
             }
 
@@ -480,8 +480,8 @@ void raylib_draw_grid(
             case COLOR_SCHEME_DEFAULT: {
                 DrawRing(
                     (Vector2) {
-                        .x = grid_padding + cell_width / 2 + cell_width * x + cell_padding * x,
-                        .y = grid_padding + cell_height / 2 + cell_height * y + cell_padding * y,
+                        .x = grid_padding + cell_width / 2 + cell_width * col + cell_padding * col,
+                        .y = grid_padding + cell_height / 2 + cell_height * row + cell_padding * row,
                     },
                     0,
                     MIN(cell_width, cell_height) / 3,
@@ -496,8 +496,8 @@ void raylib_draw_grid(
             case COLOR_SCHEME_HACKER: {
                 DrawRectangleV(
                     (Vector2) {
-                        .x = grid_padding + cell_width * x + cell_padding * x,
-                        .y = grid_padding + cell_height * y + cell_padding * y,
+                        .x = grid_padding + cell_width * col + cell_padding * col,
+                        .y = grid_padding + cell_height * row + cell_padding * row,
                     },
                     (Vector2) {
                         .x = cell_width,
@@ -549,7 +549,8 @@ void run_raylib(Cell_Array_2d *grid, bool step_manually, bool show_fps, Color_Sc
                 case COLOR_SCHEME_DEFAULT: ClearBackground(RAYWHITE); break;
                 case COLOR_SCHEME_HACKER: ClearBackground(BLACK); break;
                 }
-                    // TODO: implement this
+
+                // TODO: implement this
             }
             EndDrawing();
             break;
