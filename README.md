@@ -8,6 +8,9 @@ Controls are "q" for quitting, "space" for manually stepping through the
 simulation when using --step-manually and the mouse for interacting with the
 graphical window.
 
+![Raylib with the hacker colorscheme](./images/raylib-hacker.png)
+![Terminal with the default colorscheme](./images/terminal-default.png)
+
 ## Running the game
 
 Just run `./conway` to see the terminal version or `./conway --raylib` for the graphical one.
