@@ -17,6 +17,7 @@ typedef enum {
     EX_MEMORY_ALLOCATION    = 101,
     EX_ARGUMENT_PARSE_ERROR = 102,
     EX_INPUT_READ_ERROR     = 104,
+    EX_SHOW_USAGE           = 105,
 } Exit_Codes;
 
 #define ARR_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
@@ -685,6 +686,7 @@ typedef struct {
     bool step_manually;
     bool raylib;
     bool show_fps;
+    bool glider_gun;
     Color_Scheme color_scheme;
 } Config;
 
@@ -695,6 +697,7 @@ Config parse_arguments(const int argc, const char *argv[]) {
         .step_manually = false,
         .raylib = false,
         .show_fps = false,
+        .glider_gun = false,
         .color_scheme = -1,
     };
 
@@ -710,11 +713,25 @@ Config parse_arguments(const int argc, const char *argv[]) {
             "\n"                                                                             \
             "    --grid-rows <positive number>\n"                                            \
             "    --grid-cols <positive number>\n"                                            \
+            "\n"                                                                             \
             "    --step-manually\n"                                                          \
             "        Step manually by pressing SPACE.\n"                                     \
+            "\n"                                                                             \
             "    --graphical, --raylib\n"                                                    \
             "        Display the game using a graphical interface (with Raylib btw).\n"      \
-        )
+            "\n"                                                                             \
+            "    --show-fps\n"                                                               \
+            "        Show the FPS when rendering using raylib.\n"                            \
+            "\n"                                                                             \
+            "    --color-scheme <color scheme>\n"                                            \
+            "        Different funky colors.\n"                                              \
+            "        Available color schemes:\n"                                             \
+        );                                                                                   \
+        for (Color_Scheme color_scheme = COLOR_SCHEME_DEFAULT; color_scheme < COLOR_SCHEME_COUNT; color_scheme++) { \
+            printf(                                                                          \
+            "            %s\n", color_scheme_to_string(color_scheme)                             \
+            );                                                                               \
+        }
 
     for (size_t idx = 0; idx < argc; idx++) {
         const char *arg = argv[idx];
@@ -724,7 +741,7 @@ Config parse_arguments(const int argc, const char *argv[]) {
 
             if (strcmp(name, "h") == 0) {
                 PRINT_USAGE();
-                break;
+                exit(EX_SHOW_USAGE);
             }
 
             if (arg[1] == '-') {
@@ -733,7 +750,18 @@ Config parse_arguments(const int argc, const char *argv[]) {
                 // Options without a value
                 if (strcmp(name, "help") == 0) {
                     PRINT_USAGE();
-                    break;
+                    exit(EX_SHOW_USAGE);
+                } else
+                if (strcmp(name, "glider-gun") == 0) {
+                    if (config.grid_rows < 12 || config.grid_cols < 38) {
+                        PRINT_ERR(
+                            "The glider gun only works with a minimun size of 12 rows by 38 columns! "
+                            "(--glider-gun must be after --grid-rows and --grid-cols)\n"
+                        );
+                        exit(EX_ARGUMENT_PARSE_ERROR);
+                    }
+                    config.glider_gun = true;
+                    continue;
                 } else
                 if (strcmp(name, "show-fps") == 0) {
                     if (config.raylib != true) {
@@ -746,6 +774,7 @@ Config parse_arguments(const int argc, const char *argv[]) {
 
                 if (idx >= argc - 1) {
                     PRINT_ERR("Argument '%s' needs to have a value!\n", name);
+                    exit(EX_ARGUMENT_PARSE_ERROR);
                 }
                 const char *value = argv[idx + 1];
 
@@ -808,47 +837,48 @@ int32_t main(const int argc, const char *argv[]) {
     const Config config = parse_arguments(argc, argv);
     Cell_Array_2d grid = cell_array_init(config.grid_rows, config.grid_cols);
 
-    // Init grid
-    // TODO: make user specified
-    cell_array_set(&grid, 15, 11, true);
-    cell_array_set(&grid, 15, 12, true);
-    cell_array_set(&grid, 16, 11, true);
-    cell_array_set(&grid, 16, 12, true);
+    // Init default grid pattern
+    if (config.glider_gun) {
+        cell_array_set(&grid, 5,  1, true);
+        cell_array_set(&grid, 5,  2, true);
+        cell_array_set(&grid, 6,  1, true);
+        cell_array_set(&grid, 6,  2, true);
 
-    cell_array_set(&grid, 13, 23, true);
-    cell_array_set(&grid, 13, 24, true);
-    cell_array_set(&grid, 14, 22, true);
-    cell_array_set(&grid, 14, 26, true);
-    cell_array_set(&grid, 15, 21, true);
-    cell_array_set(&grid, 15, 27, true);
-    cell_array_set(&grid, 16, 21, true);
-    cell_array_set(&grid, 16, 25, true);
-    cell_array_set(&grid, 16, 27, true);
-    cell_array_set(&grid, 16, 28, true);
-    cell_array_set(&grid, 17, 27, true);
-    cell_array_set(&grid, 17, 21, true);
-    cell_array_set(&grid, 18, 22, true);
-    cell_array_set(&grid, 18, 26, true);
-    cell_array_set(&grid, 19, 23, true);
-    cell_array_set(&grid, 19, 24, true);
+        cell_array_set(&grid, 3, 13, true);
+        cell_array_set(&grid, 3, 14, true);
+        cell_array_set(&grid, 4, 12, true);
+        cell_array_set(&grid, 4, 16, true);
+        cell_array_set(&grid, 5, 11, true);
+        cell_array_set(&grid, 5, 17, true);
+        cell_array_set(&grid, 6, 11, true);
+        cell_array_set(&grid, 6, 15, true);
+        cell_array_set(&grid, 6, 17, true);
+        cell_array_set(&grid, 6, 18, true);
+        cell_array_set(&grid, 7, 17, true);
+        cell_array_set(&grid, 7, 11, true);
+        cell_array_set(&grid, 8, 12, true);
+        cell_array_set(&grid, 8, 16, true);
+        cell_array_set(&grid, 9, 13, true);
+        cell_array_set(&grid, 9, 14, true);
 
-    cell_array_set(&grid, 11, 35, true);
-    cell_array_set(&grid, 12, 33, true);
-    cell_array_set(&grid, 12, 35, true);
-    cell_array_set(&grid, 13, 31, true);
-    cell_array_set(&grid, 13, 32, true);
-    cell_array_set(&grid, 14, 31, true);
-    cell_array_set(&grid, 14, 32, true);
-    cell_array_set(&grid, 15, 31, true);
-    cell_array_set(&grid, 15, 32, true);
-    cell_array_set(&grid, 16, 33, true);
-    cell_array_set(&grid, 16, 35, true);
-    cell_array_set(&grid, 17, 35, true);
+        cell_array_set(&grid, 1, 25, true);
+        cell_array_set(&grid, 2, 23, true);
+        cell_array_set(&grid, 2, 25, true);
+        cell_array_set(&grid, 3, 21, true);
+        cell_array_set(&grid, 3, 22, true);
+        cell_array_set(&grid, 4, 21, true);
+        cell_array_set(&grid, 4, 22, true);
+        cell_array_set(&grid, 5, 21, true);
+        cell_array_set(&grid, 5, 22, true);
+        cell_array_set(&grid, 6, 23, true);
+        cell_array_set(&grid, 6, 25, true);
+        cell_array_set(&grid, 7, 25, true);
 
-    cell_array_set(&grid, 13, 45, true);
-    cell_array_set(&grid, 13, 46, true);
-    cell_array_set(&grid, 14, 45, true);
-    cell_array_set(&grid, 14, 46, true);
+        cell_array_set(&grid, 3, 35, true);
+        cell_array_set(&grid, 3, 36, true);
+        cell_array_set(&grid, 4, 35, true);
+        cell_array_set(&grid, 4, 36, true);
+    }
 
     if (config.raylib) {
         run_raylib(&grid, config.step_manually, config.show_fps, config.color_scheme);
