@@ -53,19 +53,19 @@ typedef struct {
     size_t rows;
 } Cell_Array_2d;
 
-bool cell_array_get(Cell_Array_2d cell_array, size_t row, size_t col) {
+bool cell_array_get(const Cell_Array_2d cell_array, const size_t row, const size_t col) {
     CELL_ARRAY_BOUNDS_CHECK(cell_array, row, col);
 
     return cell_array.cells[row][col];
 }
 
-void cell_array_set(Cell_Array_2d *cell_array, size_t row, size_t col, bool value) {
+void cell_array_set(const Cell_Array_2d *cell_array, const size_t row, const size_t col, const bool value) {
     CELL_ARRAY_PTR_BOUNDS_CHECK(cell_array, row, col);
 
     cell_array->cells[row][col] = value;
 }
 
-Cell_Array_2d cell_array_init(size_t rows, size_t cols) {
+Cell_Array_2d cell_array_init(const size_t rows, const size_t cols) {
     Cell_Array_2d cell_array = {
         .cells = malloc(sizeof(bool*) * rows),
         .rows = rows,
@@ -108,10 +108,10 @@ void cell_array_free(Cell_Array_2d cell_array) {
     cell_array.rows = 0;
 }
 
-uint8_t cell_array_alive_neighbor_count(Cell_Array_2d cell_array, size_t row, size_t col) {
+uint8_t cell_array_alive_neighbor_count(const Cell_Array_2d cell_array, const size_t row, const size_t col) {
     CELL_ARRAY_BOUNDS_CHECK(cell_array, row, col);
 
-    int32_t indices[8][2] = {
+    const int32_t indices[8][2] = {
         {row, col - 1}, // Left
         {row, col + 1}, // Right
         {row - 1, col}, // Top
@@ -125,14 +125,14 @@ uint8_t cell_array_alive_neighbor_count(Cell_Array_2d cell_array, size_t row, si
     uint8_t alive_neighbor_count = 0;
     for (size_t i = 0; i < ARR_LEN(indices); i++) {
         // Validate indices
-        int32_t row_idx = indices[i][0];
-        int32_t col_idx = indices[i][1];
+        const int32_t row_idx = indices[i][0];
+        const int32_t col_idx = indices[i][1];
 
         if (row_idx < 0 || col_idx < 0) {
             continue;
         }
-        size_t row_idx_unsigned = row_idx;
-        size_t col_idx_unsigned = col_idx;
+        const size_t row_idx_unsigned = row_idx;
+        const size_t col_idx_unsigned = col_idx;
 
         if (row_idx_unsigned >= cell_array.rows || col_idx_unsigned >= cell_array.cols) {
             continue;
@@ -153,14 +153,14 @@ typedef enum {
 } Color_Scheme;
 #define COLOR_SCHEME_COUNT (COLOR_SCHEME_HACKER - COLOR_SCHEME_DEFAULT) + 1
 
-char *color_scheme_to_string(Color_Scheme color_scheme) {
+const char *color_scheme_to_string(const Color_Scheme color_scheme) {
     switch (color_scheme) {
         case COLOR_SCHEME_DEFAULT: return "default";
         case COLOR_SCHEME_HACKER: return "hacker";
     }
 }
 
-void cell_array_print(Cell_Array_2d cell_array, Color_Scheme color_scheme) {
+void cell_array_print(const Cell_Array_2d cell_array, const Color_Scheme color_scheme) {
     for (size_t row = 0; row < cell_array.rows; row++) {
         for (size_t col = 0; col < cell_array.cols; col++) {
             char empty_cell = '.';
@@ -191,7 +191,7 @@ void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &new_termios);
 }
 
-void cursor_visible(bool visible) {
+void cursor_visible(const bool visible) {
     if (visible) {
         printf("\x1B[?25h\n");
     } else {
@@ -201,11 +201,11 @@ void cursor_visible(bool visible) {
 
 void cursor_move_home(void) { printf("\x1B[H"); }
 
-void cursor_move(uint32_t x, uint32_t y) { printf("\x1B[%d;%dH", y, x); }
+void cursor_move(const uint32_t x, const uint32_t y) { printf("\x1B[%d;%dH", y, x); }
 
-void change_fg_color(uint8_t color) { printf("\x1B[38;5;%dm", color); }
+void change_fg_color(const uint8_t color) { printf("\x1B[38;5;%dm", color); }
 
-void change_bg_color(uint8_t color) { printf("\x1B[48;5;%dm", color); }
+void change_bg_color(const uint8_t color) { printf("\x1B[48;5;%dm", color); }
 
 void clear_color(void) { printf("\x1B[0m"); }
 
@@ -215,7 +215,7 @@ static bool running = true;
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 void *check_input_terminal(void *vargp) {
 #pragma GCC diagnostic pop
-    char input = getchar();
+    const char input = getchar();
 
     if (input == 'q' || input == 'Q') {
         running = false;
@@ -229,7 +229,7 @@ void step(Cell_Array_2d *grid) {
 
     for (size_t row = 0; row < grid->rows; row++) {
         for (size_t col = 0; col < grid->cols; col++) {
-            uint8_t alive_neighbor_count = cell_array_alive_neighbor_count(*grid, row, col);
+            const uint8_t alive_neighbor_count = cell_array_alive_neighbor_count(*grid, row, col);
 
             if (cell_array_get(*grid, row, col) == true) {
                 // Alive Cell
@@ -267,7 +267,7 @@ void step(Cell_Array_2d *grid) {
     *grid = new_grid;
 }
 
-void render_terminal(Cell_Array_2d grid, Color_Scheme color_scheme) {
+void render_terminal(const Cell_Array_2d grid, const Color_Scheme color_scheme) {
     // Clear Screen
     cursor_move_home();
     erase_screen();
@@ -282,7 +282,7 @@ void render_terminal(Cell_Array_2d grid, Color_Scheme color_scheme) {
     clear_color();
 }
 
-bool is_digit(char input) {
+bool is_digit(const char input) {
     switch (input) {
     case '0':
     case '1':
@@ -300,7 +300,7 @@ bool is_digit(char input) {
     return false;
 }
 
-void set_starting_input(Cell_Array_2d *grid, Color_Scheme color_scheme) {
+void set_starting_input(const Cell_Array_2d *grid, const Color_Scheme color_scheme) {
     render_terminal(*grid, color_scheme);
     printf(
         "Give some starting input.\n"
@@ -312,7 +312,7 @@ void set_starting_input(Cell_Array_2d *grid, Color_Scheme color_scheme) {
 
     char *line = NULL;
     size_t n = 0;
-    ssize_t line_length = getline(&line, &n, stdin);
+    const ssize_t line_length = getline(&line, &n, stdin);
     if (line_length == -1) {
         PRINT_ERR("Failed reading starting input!\n");
         free(line);
@@ -364,7 +364,7 @@ void set_starting_input(Cell_Array_2d *grid, Color_Scheme color_scheme) {
     free(line);
 }
 
-void run_terminal(Cell_Array_2d *grid, bool step_manually, Color_Scheme color_scheme) {
+void run_terminal(Cell_Array_2d *grid, const bool step_manually, const Color_Scheme color_scheme) {
     set_starting_input(grid, color_scheme);
 
     // Init terminal and Quit input
@@ -422,18 +422,26 @@ void run_terminal(Cell_Array_2d *grid, bool step_manually, Color_Scheme color_sc
     cursor_visible(true);
 }
 
-void raylib_draw_grid(
-    Cell_Array_2d grid,
-    size_t grid_padding,
-    size_t cell_padding,
-    double window_width,
-    double window_height,
-    Color_Scheme color_scheme
+/**
+*   # Returns
+*
+*   The grid area width and height.
+*/
+Vector2 raylib_draw_grid(
+    const Cell_Array_2d grid,
+    const size_t grid_padding_top,
+    const size_t grid_padding_right,
+    const size_t grid_padding_left,
+    const size_t grid_padding_bottom,
+    const size_t cell_padding,
+    const double window_width,
+    const double window_height,
+    const Color_Scheme color_scheme
 ) {
-    double grid_area_width = window_width - grid_padding * 2;
-    double grid_area_height = window_height - grid_padding * 2;
-    double cell_width = (grid_area_width / grid.cols) - cell_padding;
-    double cell_height = (grid_area_height / grid.rows) - cell_padding;
+    const double grid_area_width = window_width - grid_padding_left - grid_padding_right;
+    const double grid_area_height = window_height - grid_padding_top - grid_padding_bottom;
+    const double cell_width = (grid_area_width / grid.cols) - cell_padding;
+    const double cell_height = (grid_area_height / grid.rows) - cell_padding;
 
     // Draw Grid
     // Horizontal lines
@@ -441,12 +449,12 @@ void raylib_draw_grid(
         for (size_t row = 0; row <= grid.rows; row++) {
             DrawLineEx(
                 (Vector2) {
-                    .x = grid_padding,
-                    .y = grid_padding + cell_height * row + cell_padding * row,
+                    .x = grid_padding_left,
+                    .y = grid_padding_top + cell_height * row + cell_padding * row,
                 },
                 (Vector2) {
-                    .x = window_width - grid_padding,
-                    .y = grid_padding + cell_height * row + cell_padding * row,
+                    .x = window_width - grid_padding_right,
+                    .y = grid_padding_top + cell_height * row + cell_padding * row,
                 },
                 1,
                 GRAY
@@ -456,12 +464,12 @@ void raylib_draw_grid(
         for (size_t col = 0; col <= grid.cols; col++) {
             DrawLineEx(
                 (Vector2) {
-                    .x = grid_padding + cell_width * col + cell_padding * col,
-                    .y = grid_padding,
+                    .x = grid_padding_left + cell_width * col + cell_padding * col,
+                    .y = grid_padding_top,
                 },
                 (Vector2) {
-                    .x = grid_padding + cell_width * col + cell_padding * col,
-                    .y = window_height - grid_padding,
+                    .x = grid_padding_left + cell_width * col + cell_padding * col,
+                    .y = window_height - grid_padding_bottom,
                 },
                 1,
                 GRAY
@@ -480,8 +488,8 @@ void raylib_draw_grid(
             case COLOR_SCHEME_DEFAULT: {
                 DrawRing(
                     (Vector2) {
-                        .x = grid_padding + cell_width / 2 + cell_width * col + cell_padding * col,
-                        .y = grid_padding + cell_height / 2 + cell_height * row + cell_padding * row,
+                        .x = grid_padding_left + cell_width / 2 + cell_width * col + cell_padding * col,
+                        .y = grid_padding_top + cell_height / 2 + cell_height * row + cell_padding * row,
                     },
                     0,
                     MIN(cell_width, cell_height) / 3,
@@ -496,8 +504,8 @@ void raylib_draw_grid(
             case COLOR_SCHEME_HACKER: {
                 DrawRectangleV(
                     (Vector2) {
-                        .x = grid_padding + cell_width * col + cell_padding * col,
-                        .y = grid_padding + cell_height * row + cell_padding * row,
+                        .x = grid_padding_left + cell_width * col + cell_padding * col,
+                        .y = grid_padding_top + cell_height * row + cell_padding * row,
                     },
                     (Vector2) {
                         .x = cell_width,
@@ -510,14 +518,16 @@ void raylib_draw_grid(
             }
         }
     }
+
+    return (Vector2) { .x = grid_area_width, .y = grid_area_height };
 }
 
-void run_raylib(Cell_Array_2d *grid, bool step_manually, bool show_fps, Color_Scheme color_scheme) {
+void run_raylib(Cell_Array_2d *grid, const bool step_manually, const bool show_fps, const Color_Scheme color_scheme) {
     typedef enum {
         STATE_PLACING,
         STATE_SIMULATING,
     } State;
-    State state = STATE_SIMULATING;
+    State state = STATE_PLACING;
 
     const size_t cell_padding = 1;
     const size_t grid_padding = 10;
@@ -531,6 +541,29 @@ void run_raylib(Cell_Array_2d *grid, bool step_manually, bool show_fps, Color_Sc
     double previous_time_s = GetTime();
     const size_t target_ups = 32;
 
+    const size_t font_size = 24;
+    const Vector2 text_pos = {
+        .x = 10,
+        .y = 10,
+    };
+    Color text_color = RAYWHITE;
+    switch (color_scheme) {
+        case COLOR_SCHEME_DEFAULT: text_color = BLACK; break;
+        case COLOR_SCHEME_HACKER: text_color = RAYWHITE; break;
+    }
+
+    const size_t start_button_font_size = font_size - 4;
+    const char *start_button_text = "START";
+    const Vector2 start_button_text_padding = { 10, 5 };
+    const size_t start_button_text_width = MeasureText(start_button_text, start_button_font_size);
+    const float start_button_width = start_button_text_width + start_button_text_padding.x * 2;
+
+    #define DRAW_BACKGROUND()                                        \
+        switch (color_scheme) {                                      \
+        case COLOR_SCHEME_DEFAULT: ClearBackground(RAYWHITE); break; \
+        case COLOR_SCHEME_HACKER: ClearBackground(BLACK); break;     \
+        }
+
     while (!WindowShouldClose()) {
         if (IsKeyDown(KEY_Q)) {
             break;
@@ -543,33 +576,75 @@ void run_raylib(Cell_Array_2d *grid, bool step_manually, bool show_fps, Color_Sc
 
         switch (state) {
         case STATE_PLACING: {
+            const Vector2 mouse_pos = GetMousePosition();
+            const Rectangle start_button = {
+                .x = window_width - 10 - start_button_width,
+                .y = 5,
+                .width = start_button_width,
+                .height = start_button_font_size + start_button_text_padding.y * 2,
+            };
+
             BeginDrawing();
             {
-                switch (color_scheme) {
-                case COLOR_SCHEME_DEFAULT: ClearBackground(RAYWHITE); break;
-                case COLOR_SCHEME_HACKER: ClearBackground(BLACK); break;
+                DRAW_BACKGROUND();
+
+                const size_t grid_padding_top = grid_padding + font_size + text_pos.y;
+                const Vector2 grid_area_size = raylib_draw_grid(
+                    *grid,
+                    grid_padding_top, grid_padding, grid_padding, grid_padding,
+                    cell_padding,
+                    window_width,
+                    window_height,
+                    color_scheme
+                );
+
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                    // Place the starting cells
+                    const size_t mouse_row = (mouse_pos.y - grid_padding_top) / (grid_area_size.y / grid->rows);
+                    const size_t mouse_col = (mouse_pos.x - grid_padding) / (grid_area_size.x / grid->cols);
+                    if (mouse_row < grid->rows && mouse_col < grid->cols) {
+                        cell_array_set(grid, mouse_row, mouse_col, true);
+                    }
+
+                    // Press Start Button
+                    if (CheckCollisionPointRec(mouse_pos, start_button)) {
+                        state = STATE_SIMULATING;
+                    }
                 }
 
-                // TODO: implement this
+                DrawText("Set the starting input using left click.", text_pos.x, text_pos.y, font_size, text_color);
+
+                // Draw Start Button
+                DrawRectangleRec(start_button, GRAY);
+                DrawText(
+                    start_button_text,
+                    start_button.x + start_button_text_padding.x,
+                    start_button.y + start_button_text_padding.y,
+                    start_button_font_size,
+                    ORANGE
+                );
             }
             EndDrawing();
             break;
         }
 
         case STATE_SIMULATING: {
-            window_width = MIN(window_width, window_height);
-            window_height = MIN(window_width, window_height);
-
             BeginDrawing();
             {
-                switch (color_scheme) {
-                case COLOR_SCHEME_DEFAULT: ClearBackground(RAYWHITE); break;
-                case COLOR_SCHEME_HACKER: ClearBackground(BLACK); break;
-                }
+                DRAW_BACKGROUND();
+
+                raylib_draw_grid(
+                    *grid,
+                    grid_padding, grid_padding, grid_padding, grid_padding,
+                    cell_padding,
+                    window_width,
+                    window_height,
+                    color_scheme
+                );
+
                 if (show_fps) {
                     DrawFPS(0, 0);
                 }
-                raylib_draw_grid(*grid, grid_padding, cell_padding, window_width, window_height, color_scheme);
             }
             EndDrawing();
 
@@ -582,9 +657,9 @@ void run_raylib(Cell_Array_2d *grid, bool step_manually, bool show_fps, Color_Sc
                 // Magic timekeeping for a fixed timestep from the raylib examples:
                 // https://www.raylib.com/examples/core/loader.html?name=core_custom_frame_control
                 double current_time_s = GetTime();
-                double update_draw_time_s = current_time_s - previous_time_s;
+                const double update_draw_time_s = current_time_s - previous_time_s;
                 if (target_ups > 0) {
-                    double wait_time_s = (1.0f/(float)target_ups) - update_draw_time_s;
+                    const double wait_time_s = (1.0f/(float)target_ups) - update_draw_time_s;
                     if (wait_time_s > 0.0) {
                         WaitTime((float)wait_time_s);
                         current_time_s = GetTime();
@@ -613,7 +688,7 @@ typedef struct {
     Color_Scheme color_scheme;
 } Config;
 
-Config parse_arguments(int argc, char *argv[]) {
+Config parse_arguments(const int argc, const char *argv[]) {
     Config config = {
         .grid_rows = 69,
         .grid_cols = 69,
@@ -642,10 +717,10 @@ Config parse_arguments(int argc, char *argv[]) {
         )
 
     for (size_t idx = 0; idx < argc; idx++) {
-        char *arg = argv[idx];
+        const char *arg = argv[idx];
 
         if (arg[0] == '-') {
-            char *name = &arg[1];
+            const char *name = &arg[1];
 
             if (strcmp(name, "h") == 0) {
                 PRINT_USAGE();
@@ -672,11 +747,11 @@ Config parse_arguments(int argc, char *argv[]) {
                 if (idx >= argc - 1) {
                     PRINT_ERR("Argument '%s' needs to have a value!\n", name);
                 }
-                char *value = argv[idx + 1];
+                const char *value = argv[idx + 1];
 
                 // Options with a value
                 if (strcmp(name, "grid-rows") == 0) {
-                    size_t rows = atoi(value);
+                    const size_t rows = atoi(value);
                     if (rows == 0) {
                         PRINT_ERR("Grid rows should be bigger than 0.\n");
                         exit(EX_ARGUMENT_PARSE_ERROR);
@@ -685,7 +760,7 @@ Config parse_arguments(int argc, char *argv[]) {
                     config.grid_rows = atoi(value);
                 } else
                 if (strcmp(name, "grid-cols") == 0) {
-                    size_t cols = atoi(value);
+                    const size_t cols = atoi(value);
                     if (cols == 0) {
                         PRINT_ERR("Grid columns should be bigger than 0.\n");
                         exit(EX_ARGUMENT_PARSE_ERROR);
@@ -729,8 +804,8 @@ Config parse_arguments(int argc, char *argv[]) {
     return config;
 }
 
-int32_t main(int argc, char *argv[]) {
-    Config config = parse_arguments(argc, argv);
+int32_t main(const int argc, const char *argv[]) {
+    const Config config = parse_arguments(argc, argv);
     Cell_Array_2d grid = cell_array_init(config.grid_rows, config.grid_cols);
 
     // Init grid
