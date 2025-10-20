@@ -149,16 +149,17 @@ uint8_t cell_array_alive_neighbor_count(const Cell_Array_2d cell_array, const si
 }
 
 typedef enum {
-    COLOR_SCHEME_DEFAULT,
-    COLOR_SCHEME_HACKER,
+    COLOR_SCHEME_DEFAULT = 0,
+    COLOR_SCHEME_HACKER  = 1,
 } Color_Scheme;
 #define COLOR_SCHEME_COUNT (COLOR_SCHEME_HACKER - COLOR_SCHEME_DEFAULT) + 1
 
 const char *color_scheme_to_string(const Color_Scheme color_scheme) {
     switch (color_scheme) {
         case COLOR_SCHEME_DEFAULT: return "default";
-        case COLOR_SCHEME_HACKER: return "hacker";
+        case COLOR_SCHEME_HACKER:  return "hacker";
     }
+    return "";
 }
 
 void cell_array_print(const Cell_Array_2d cell_array, const Color_Scheme color_scheme) {
@@ -167,7 +168,7 @@ void cell_array_print(const Cell_Array_2d cell_array, const Color_Scheme color_s
             char empty_cell = '.';
             switch (color_scheme) {
                 case COLOR_SCHEME_DEFAULT: empty_cell = '.'; break;
-                case COLOR_SCHEME_HACKER: empty_cell = ' '; break;
+                case COLOR_SCHEME_HACKER:  empty_cell = ' '; break;
             }
 
             printf("%c", cell_array_get(cell_array, row, col) ? 'X' : empty_cell);
@@ -212,7 +213,10 @@ void clear_color(void) { printf("\x1B[0m"); }
 
 static bool running = true;
 
-void ctrlc_handler(int _signum) { running = false; }
+void ctrlc_handler(int _signum) {
+    (void)_signum; // Unused parameter
+    running = false;
+}
 
 // Catches the CTRL+C signal and calls the `ctrlc_handler` function.
 // NOTE: $ man 2 sigaction
@@ -333,7 +337,7 @@ void set_starting_input(const Cell_Array_2d *grid, const char *input, const size
         bool is_some;
     } Number_Or_None;
 
-    Number_Or_None numbers[2]; // [0] => row, [1] => col
+    Number_Or_None numbers[2] = {}; // [0] => row, [1] => col
     size_t number_idx = 0;
     size_t digit_idx = 0;
     for (size_t idx = 0; idx < input_len; idx++) {
@@ -732,7 +736,7 @@ typedef struct {
     char *starting_input;
 } Config;
 
-Config parse_arguments(const int argc, char *argv[]) {
+Config parse_arguments(const unsigned int argc, char *argv[]) {
     Config config = {
         .grid_rows = 69,
         .grid_cols = 69,
@@ -741,7 +745,7 @@ Config parse_arguments(const int argc, char *argv[]) {
         .show_fps = false,
         .glider_gun = false,
         .starting_input = "",
-        .color_scheme = -1,
+        .color_scheme = COLOR_SCHEME_DEFAULT,
     };
 
     #define PRINT_USAGE()                                                                                           \
@@ -869,7 +873,9 @@ Config parse_arguments(const int argc, char *argv[]) {
                         }
                     }
 
-                    if (config.color_scheme == -1) {
+                    if (config.color_scheme == COLOR_SCHEME_DEFAULT
+                        && !(strcmp(value, color_scheme_to_string(COLOR_SCHEME_DEFAULT)) == 0)
+                    ) {
                         PRINT_ERR("Invalid color scheme \"%s\"!\n", value);
                         PRINT_ERR("Valid color schemes are:\n");
                         for (Color_Scheme color_scheme = COLOR_SCHEME_DEFAULT; color_scheme < COLOR_SCHEME_COUNT; color_scheme++) {
@@ -880,10 +886,6 @@ Config parse_arguments(const int argc, char *argv[]) {
                 }
             }
         }
-    }
-
-    if (config.color_scheme == -1) {
-        config.color_scheme = COLOR_SCHEME_DEFAULT;
     }
 
     return config;
