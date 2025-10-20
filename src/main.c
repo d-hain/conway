@@ -28,20 +28,24 @@ typedef enum {
 #define CELL_ARRAY_BOUNDS_CHECK(grid, row, col)                                      \
     if (row > grid.rows) {                                                           \
         PRINT_ERR_LOC("Cell Array index out of range! Y Coordinate is too big.\n");  \
+        cell_array_free(grid);                                                       \
         exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }                                                                                \
     if (col > grid.cols) {                                                           \
         PRINT_ERR_LOC("Cell Array index out of range! X Coordinate is too big.\n");  \
+        cell_array_free(grid);                                                       \
         exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }
 
 #define CELL_ARRAY_PTR_BOUNDS_CHECK(grid, row, col)                                  \
     if (row > grid->rows) {                                                          \
         PRINT_ERR_LOC("Cell Array index out of range! Y Coordinate is too big.\n");  \
+        cell_array_free_ptr(grid);                                                   \
         exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }                                                                                \
     if (col > grid->cols) {                                                          \
         PRINT_ERR_LOC("Cell Array index out of range! X Coordinate is too big.\n");  \
+        cell_array_free_ptr(grid);                                                   \
         exit(EX_ARR_OUT_OF_RANGE);                                                   \
     }
 
@@ -53,18 +57,6 @@ typedef struct {
     size_t cols;
     size_t rows;
 } Cell_Array_2d;
-
-bool cell_array_get(const Cell_Array_2d cell_array, const size_t row, const size_t col) {
-    CELL_ARRAY_BOUNDS_CHECK(cell_array, row, col);
-
-    return cell_array.cells[row][col];
-}
-
-void cell_array_set(const Cell_Array_2d *cell_array, const size_t row, const size_t col, const bool value) {
-    CELL_ARRAY_PTR_BOUNDS_CHECK(cell_array, row, col);
-
-    cell_array->cells[row][col] = value;
-}
 
 Cell_Array_2d cell_array_init(const size_t rows, const size_t cols) {
     Cell_Array_2d cell_array = {
@@ -107,6 +99,28 @@ void cell_array_free(Cell_Array_2d cell_array) {
     free(cell_array.cells);
     cell_array.cols = 0;
     cell_array.rows = 0;
+}
+
+void cell_array_free_ptr(Cell_Array_2d *cell_array) {
+    for (size_t idx = 0; idx < cell_array->rows; idx++) {
+        free(cell_array->cells[idx]);
+    }
+    free(cell_array->cells);
+    cell_array->cols = 0;
+    cell_array->rows = 0;
+    cell_array = NULL;
+}
+
+bool cell_array_get(const Cell_Array_2d cell_array, const size_t row, const size_t col) {
+    CELL_ARRAY_BOUNDS_CHECK(cell_array, row, col);
+
+    return cell_array.cells[row][col];
+}
+
+void cell_array_set(Cell_Array_2d *cell_array, const size_t row, const size_t col, const bool value) {
+    CELL_ARRAY_PTR_BOUNDS_CHECK(cell_array, row, col);
+
+    cell_array->cells[row][col] = value;
 }
 
 uint8_t cell_array_alive_neighbor_count(const Cell_Array_2d cell_array, const size_t row, const size_t col) {
@@ -319,7 +333,7 @@ bool is_digit(const char input) {
     return false;
 }
 
-void set_starting_input(const Cell_Array_2d *grid, const char *input, const size_t input_len) {
+void set_starting_input(Cell_Array_2d *grid, const char *input, const size_t input_len) {
     if (input_len == 0) return;
 
     // Parse user input
@@ -372,7 +386,7 @@ void set_starting_input(const Cell_Array_2d *grid, const char *input, const size
     PARSE_AND_SET_NUMBERS();
 }
 
-void terminal_get_starting_input(const Cell_Array_2d *grid, const Color_Scheme color_scheme) {
+void terminal_get_starting_input(Cell_Array_2d *grid, const Color_Scheme color_scheme) {
     render_terminal(*grid, color_scheme);
     printf(
         "Give some starting input.\n"
