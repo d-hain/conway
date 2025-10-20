@@ -20,6 +20,8 @@ typedef enum {
     EX_SHOW_USAGE           = 105,
 } Exit_Codes;
 
+#define UNUSED(x) (void)(x)
+
 #define ARR_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 #define PRINT_ERR_LOC(fmt, ...) fprintf(stderr, "[ERROR] %s:%d: " fmt, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
@@ -228,7 +230,7 @@ void clear_color(void) { printf("\x1B[0m"); }
 static bool running = true;
 
 void ctrlc_handler(int _signum) {
-    (void)_signum; // Unused parameter
+    UNUSED(_signum);
     running = false;
 }
 
@@ -244,10 +246,8 @@ void setup_ctrlc_handler(void) {
     sigaction(SIGTERM, &sa, NULL);
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-void *check_input_terminal(void *vargp) {
-#pragma GCC diagnostic pop
+void *check_input_terminal(void *_vargp) {
+    UNUSED(_vargp);
     const char input = getchar();
 
     if (input == 'q' || input == 'Q') {
@@ -402,6 +402,7 @@ void terminal_get_starting_input(Cell_Array_2d *grid, const Color_Scheme color_s
     if (line_length == -1) {
         PRINT_ERR("Failed reading starting input!\n");
         free(line);
+        cell_array_free_ptr(grid);
         exit(EX_INPUT_READ_ERROR);
     }
     // Remove newline
